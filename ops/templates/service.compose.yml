@@ -1,0 +1,20 @@
+# Copy this block into docker-compose.yml for a new service. Replace <name>
+# (and <NAME>), delete what you don't need. Then: echo '<NAME>_TAG=dev' >> .env
+# Full walkthrough: docs/adding-a-service.md
+#
+#  <name>:
+#    image: pulse-<name>:${<NAME>_TAG:-dev}
+#    build: apps/<name>
+#    environment:
+#      DATABASE_URL: postgres://pulse:dev@postgres:5432/pulse   # if it needs the DB
+#    ports:
+#      - '<host-port>:<container-port>'                         # if it serves HTTP
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#    healthcheck:                                               # if it serves HTTP
+#      test: ['CMD-SHELL', 'wget -qO- http://localhost:<container-port>/healthz || exit 1']
+#      interval: 5s
+#      timeout: 5s
+#      retries: 5
+#    restart: unless-stopped

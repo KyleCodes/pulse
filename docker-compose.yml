@@ -1,0 +1,97 @@
+# The deployable artifact. App services carry both `image:` (versioned tag from
+# .env — the deploy/rollback pointer) and `build:` (so `docker compose up --build`
+# works with zero extra tooling). Services address each other by compose DNS.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: pulse
+      POSTGRES_USER: pulse
+      POSTGRES_PASSWORD: dev
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./ops/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - '${PG_PORT:-5432}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pulse -d pulse']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Log database (queried from Grafana). Image's default single-node config.
+  loki:
+    image: grafana/loki:3.1.1
+
+  promtail:
+    image: grafana/promtail:3.1.1
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./ops/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      # Local operator dashboard: anonymous Admin, no login form. Not for prod.
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: 'Admin'
+      GF_AUTH_DISABLE_LOGIN_FORM: 'true'
+    volumes:
+      - ./ops/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - '${GRAFANA_PORT:-3000}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      loki:
+        condition: service_started
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/api/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: pulse-api:${API_TAG:-dev}
+    build: apps/api
+    environment:
+      DATABASE_URL: postgres://pulse:dev@postgres:5432/pulse
+      PORT: '8000'
+    ports:
+      - '${API_PORT:-8000}:8000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import urllib.request;urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # No ports / container_name: `docker compose up -d --scale worker=N` must work.
+  worker:
+    image: pulse-worker:${WORKER_TAG:-dev}
+    build: apps/worker
+    environment:
+      DATABASE_URL: postgres://pulse:dev@postgres:5432/pulse
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  dashboard:
+    image: pulse-dashboard:${DASHBOARD_TAG:-dev}
+    build: apps/dashboard
+    ports:
+      - '${DASHBOARD_PORT:-8080}:80'
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:

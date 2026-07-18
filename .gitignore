@@ -1,0 +1,11 @@
+node_modules/
+.env.tmp
+.load.pid
+nohup.out
+.nx/
+apps/api/.venv/
+
+# private working material, not part of the submission
+initial_notes.md
+assignment.pdf
+__pycache__/

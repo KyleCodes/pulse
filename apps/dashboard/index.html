@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>pulse</title>
+  <style>body { font-family: system-ui, sans-serif; margin: 2rem; }</style>
+</head>
+<body>
+  <h1>pulse dashboard (stub)</h1>
+  <p>Implementation contract: <code>apps/dashboard/SPEC.md</code></p>
+  <p id="api-status">checking api…</p>
+  <script>
+    fetch('/api/healthz')
+      .then((r) => r.json())
+      .then((d) => (document.getElementById('api-status').textContent = 'api reachable: ' + JSON.stringify(d)))
+      .catch(() => (document.getElementById('api-status').textContent = 'api unreachable (expected in host dev — no proxy)'));
+  </script>
+</body>
+</html>
