@@ -84,6 +84,17 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # 4th service (docs/adding-a-service.md): HTTP-only, no ports, no DB.
+  traffic:
+    image: pulse-traffic:${TRAFFIC_TAG:-dev}
+    build: apps/traffic
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
   dashboard:
     image: pulse-dashboard:${DASHBOARD_TAG:-dev}
     build: apps/dashboard

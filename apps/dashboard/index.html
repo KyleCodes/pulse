@@ -3,17 +3,118 @@
 <head>
   <meta charset="utf-8" />
   <title>pulse</title>
-  <style>body { font-family: system-ui, sans-serif; margin: 2rem; }</style>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 4px 8px; }
+    .err { color: #b00; }
+    #trend { display: flex; align-items: flex-end; gap: 2px; height: 100px; }
+    #trend div { width: 8px; background: #369; }
+  </style>
 </head>
 <body>
-  <h1>pulse dashboard (stub)</h1>
-  <p>Implementation contract: <code>apps/dashboard/SPEC.md</code></p>
-  <p id="api-status">checking api…</p>
+  <h1>pulse</h1>
+  <form id="site-form">
+    <input id="site" value="site-a" />
+    <button>Load</button>
+  </form>
+  <h2>Top pages</h2>
+  <div id="pages"></div>
+  <h2>p75 LCP trend (60m)</h2>
+  <div id="trend"></div>
+  <h2>Experiments</h2>
+  <div id="experiments"></div>
+
   <script>
-    fetch('/api/healthz')
-      .then((r) => r.json())
-      .then((d) => (document.getElementById('api-status').textContent = 'api reachable: ' + JSON.stringify(d)))
-      .catch(() => (document.getElementById('api-status').textContent = 'api unreachable (expected in host dev — no proxy)'));
+    const $ = (id) => document.getElementById(id);
+    let currentSite = 'site-a';
+    let timer = null;
+
+    const fmtMs = (v) => (v == null ? '—' : Math.round(v));
+    const fmtTime = (ts) => (ts == null ? '—' : new Date(ts).toLocaleTimeString());
+
+    function el(tag, text) {
+      const e = document.createElement(tag);
+      if (text != null) e.textContent = text;
+      return e;
+    }
+
+    function msg(container, text) {
+      const p = el('p', text);
+      p.className = 'err';
+      container.replaceChildren(p);
+    }
+
+    async function load(path, container, render, notFoundMsg) {
+      try {
+        const r = await fetch(path);
+        if (r.status === 404) return msg(container, notFoundMsg);
+        if (!r.ok) return msg(container, 'error: HTTP ' + r.status);
+        render(await r.json(), container);
+      } catch (e) {
+        msg(container, 'error: ' + e.message);
+      }
+    }
+
+    function renderPages(rows, container) {
+      if (!rows.length) return msg(container, 'no pages yet');
+      const table = el('table');
+      const head = el('tr');
+      for (const h of ['page_url', 'events', 'p75 LCP (ms)', 'last seen']) head.appendChild(el('th', h));
+      table.appendChild(head);
+      for (const row of rows) {
+        const tr = el('tr');
+        tr.appendChild(el('td', row.page_url));
+        tr.appendChild(el('td', row.event_count));
+        tr.appendChild(el('td', fmtMs(row.p75_lcp_ms)));
+        tr.appendChild(el('td', fmtTime(row.last_seen)));
+        table.appendChild(tr);
+      }
+      container.replaceChildren(table);
+    }
+
+    function renderTrend(buckets, container) {
+      if (!buckets.length) return msg(container, 'no trend data');
+      const max = Math.max(...buckets.map((b) => b.p75_lcp_ms || 0), 1);
+      container.replaceChildren(
+        ...buckets.map((b) => {
+          const bar = el('div');
+          bar.style.height = Math.max((b.p75_lcp_ms / max) * 100 || 0, 1) + 'px';
+          bar.title = fmtTime(b.bucket) + ' — p75 ' + fmtMs(b.p75_lcp_ms) + 'ms (n=' + b.count + ')';
+          return bar;
+        })
+      );
+    }
+
+    function renderConfig(cfg, container) {
+      const list = el('ul');
+      for (const exp of cfg.experiments) list.appendChild(el('li', exp.name + ' — ' + exp.status));
+      container.replaceChildren(
+        el('p', 'sampling rate: ' + cfg.sampling_rate),
+        cfg.experiments.length ? list : el('p', 'no experiments')
+      );
+    }
+
+    function refresh() {
+      const site = encodeURIComponent(currentSite);
+      load('/api/sites/' + site + '/pages', $('pages'), renderPages, 'no data');
+      load('/api/sites/' + site + '/trend', $('trend'), renderTrend, 'no data');
+      load('/api/config/' + site, $('experiments'), renderConfig, 'unknown site');
+    }
+
+    function start(site) {
+      site = site.trim();
+      if (!site) return;
+      currentSite = site;
+      clearInterval(timer);
+      refresh();
+      timer = setInterval(refresh, 5000);
+    }
+
+    $('site-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      start($('site').value);
+    });
+    start(currentSite);
   </script>
 </body>
 </html>

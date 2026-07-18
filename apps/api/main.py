@@ -1,4 +1,5 @@
 # pulse api — contract: apps/api/SPEC.md. Stateless: every request hits Postgres.
+import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -7,6 +8,9 @@ from fastapi import FastAPI, HTTPException
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 from pydantic import BaseModel
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+log = logging.getLogger("api")
 
 pool = ConnectionPool(
     os.environ["DATABASE_URL"], min_size=1, max_size=5, open=False
@@ -33,6 +37,7 @@ class Event(BaseModel):
 
 @app.post("/events", status_code=202)
 def ingest(event: Event):
+    log.info("POST /events %s", event.model_dump_json())
     with pool.connection() as conn:
         conn.execute(
             "INSERT INTO events_queue (site_id, page_url, lcp_ms, session_id, ts)"
@@ -44,6 +49,7 @@ def ingest(event: Event):
 
 @app.get("/config/{site_id}")
 def config(site_id: str):
+    log.info("GET /config site_id=%s", site_id)
     with pool.connection() as conn:
         row = conn.execute(
             "SELECT site_id, sampling_rate, experiments FROM site_config WHERE site_id = %s",
@@ -56,6 +62,7 @@ def config(site_id: str):
 
 @app.get("/sites/{site_id}/pages")
 def pages(site_id: str):
+    log.info("GET /sites/pages site_id=%s", site_id)
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             return cur.execute(
@@ -68,6 +75,7 @@ def pages(site_id: str):
 
 @app.get("/sites/{site_id}/trend")
 def trend(site_id: str):
+    log.info("GET /sites/trend site_id=%s", site_id)
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             return cur.execute(
@@ -82,6 +90,7 @@ def trend(site_id: str):
 
 @app.get("/healthz")
 def healthz():
+    log.info("GET /healthz")
     with pool.connection() as conn:
         conn.execute("SELECT 1")
     return {"ok": True}
