@@ -2,7 +2,7 @@
 
 Web-performance monitoring on a minimum viable platform: a FastAPI ingest api, a Go aggregate worker, a static customer dashboard, and an always-on traffic generator — all on docker compose with artifact-based deploys, centralized logs, and a provisioned operator dashboard.
 
-**Docs:** [design](docs/design.md) · [requirements](docs/requirements.md) · [user guide](docs/user-guide.md) · [runbook](docs/runbook.md) · [adding a service](docs/adding-a-service.md) · [test plan](docs/test-plan.md)
+**Docs:** [design](docs/design.md) · [requirements](docs/requirements.md) · [user guide](docs/user-guide.md) · [runbook](docs/runbook.md) · [adding a service](docs/adding-a-service.md) · [test plan](docs/test-plan.md) · [deployment strategy](docs/deployment-strategy.md)
 
 Prereqs: **docker + make**. (Node is used only by `make deploy`; every step has a raw-docker fallback in the [user guide](docs/user-guide.md).)
 
