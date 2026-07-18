@@ -16,13 +16,15 @@ dev:
 build:
 	npx nx run-many -t build $(if $(SERVICE),-p $(SERVICE),)
 
+# Foreground by default: log streams from every service in this terminal
+# (Ctrl-C stops the stack). `make up D=1` detaches instead.
 up:
-	$(COMPOSE) up -d --build
 	@echo ""
 	@echo "  dashboard  http://localhost:8080"
 	@echo "  grafana    http://localhost:3000   (Pulse Ops dashboard, no login)"
 	@echo "  api        http://localhost:8000/docs"
 	@echo ""
+	$(COMPOSE) up --build $(if $(D),-d,)
 
 down:
 	$(COMPOSE) down

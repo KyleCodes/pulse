@@ -5,7 +5,8 @@ Day-to-day platform usage. Host deps: **docker + make** (Node only for `make dep
 ## Start / stop
 
 ```sh
-make up      # build + start everything, prints URLs
+make up      # build + start everything, attached: all logs stream to this terminal (Ctrl-C stops)
+make up D=1  # detached
 make down    # stop (data kept)
 make reset   # stop + wipe data; next up re-seeds
 ```
